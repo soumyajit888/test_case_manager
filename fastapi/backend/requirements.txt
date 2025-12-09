@@ -1,0 +1,1 @@
+fastapi  # High-performance, async frameworkuvicorn[standard] # ASGI server to run FastAPIasyncpg # Asynchronous PostgreSQL adapterpydantic # For data validation/schemas (comes with FastAPI)

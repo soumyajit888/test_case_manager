@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LDQA-Checklist: 3D-Visualization</title>
+    <!-- Load Tailwind CSS from CDN for modern, responsive styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Link to external CSS file for separation of concerns (FIXED) -->
+    <link rel="stylesheet" href="styles.css">
+
+    <!-- Firebase SDKs for Google Authentication -->
+    <script type="module">
+        // Import necessary Firebase modules from CDN
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInWithCustomToken, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        
+        // Expose Firebase functions globally for the main script scope to use
+        window.firebase = {
+            initializeApp,
+            getAuth,
+            signInWithCustomToken,
+            signInWithPopup,
+            GoogleAuthProvider,
+            signOut,
+            onAuthStateChanged,
+            signInAnonymously,
+            getFirestore
+        };
+    </script>
+</head>
+<body class="p-4 md:p-8">
+
+    <div class="max-w-7xl mx-auto bg-white p-6 rounded-xl shadow-2xl">
+        <!-- Glorified Titles and Subheaders -->
+        <header class="text-center mb-6 pb-4 border-b-4 border-indigo-100">
+            <div class="flex justify-between items-center mb-4">
+                <div class="flex-shrink-0 w-20"></div>
+                <!-- Main Titles -->
+                <div class="flex-grow">
+                    <h1 class="text-5xl font-extrabold text-gray-900 tracking-tight mb-1">LDQA-Checklist</h1>
+                    <h2 class="text-2xl font-semibold text-indigo-600 mb-4">3D-Visualization Assurance Record</h2>
+                </div>
+                <!-- Auth Status & Button Container -->
+                <div id="auth-status-container" class="flex flex-col items-center space-y-2 w-20">
+                    <button id="auth-button" class="px-3 py-1 text-xs font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition shadow-md">
+                        Loading...
+                    </button>
+                    <!-- User info displays once logged in -->
+                    <div id="user-info" class="flex items-center space-x-1 text-xs text-gray-600 hidden">
+                        <img id="user-photo" class="h-6 w-6 rounded-full" src="" alt="User Photo">
+                        <span id="user-name" class="font-medium"></span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Subheader information -->
+            <div class="flex justify-center space-x-6 text-sm text-gray-600">
+                <div class="font-medium text-gray-800 bg-gray-50 p-1.5 rounded-lg shadow-sm">
+                    Team: <span class="text-indigo-700 font-bold">LDTOOLS</span>
+                </div>
+                <div class="font-medium text-gray-800 bg-gray-50 p-1.5 rounded-lg shadow-sm">
+                    QA: <span class="text-indigo-700 font-bold">ABC, DEF</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Toolbar (Action Buttons) -->
+        <div class="mb-6 flex flex-wrap gap-4 justify-between items-center">
+            <!-- Add New Row Button (Enabled only when authenticated) -->
+            <button onclick="addNewEntryRow()" id="add-entry-btn" class="px-4 py-2 bg-green-600 text-white font-medium rounded-lg shadow-md hover:bg-green-700 transition flex items-center disabled:opacity-50" disabled>
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" /></svg>
+                Add New Test Record
+            </button>
+            
+            <!-- Create JIRA Issue Button (Bulk action, enabled only when authenticated and selected) -->
+            <button id="create-jira-btn" onclick="createJiraIssue()" class="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg shadow-md hover:bg-blue-700 transition flex items-center disabled:opacity-50" disabled>
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor"><path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.606 4.394a1 1 0 00-1.414 1.414l.707.707a1 1 0 101.414-1.414l-.707-.707zM18 10a1 1 0 00-1-1h-1a1 1 0 100 2h1a1 1 0 001-1zM15.606 15.606a1 1 0 001.414-1.414l-.707-.707a1 1 0 10-1.414 1.414l.707.707zM10 17a1 1 0 00-1 1v1a1 1 0 102 0v-1a1 1 0 00-1-1zM4.394 15.606a1 1 0 00-1.414-.707l-.707.707a1 1 0 101.414 1.414l.707-.707zM2 10a1 1 0 001 1h1a1 1 0 100-2H3a1 1 0 00-1 1zM4.394 4.394a1 1 0 00.707-1.414l-.707-.707a1 1 0 10-1.414 1.414l.707.707zM10 5a5 5 0 100 10 5 5 0 000-10zm-3 5a3 3 0 116 0 3 3 0 01-6 0z" fill-rule="evenodd" clip-rule="evenodd"></path></svg>
+                Create JIRA Issue (<span id="selected-count">0</span>)
+            </button>
+
+            <span id="loading-indicator" class="text-sm text-gray-500 hidden">Loading...</span>
+        </div>
+
+        <!-- Data Table Structure -->
+        <div class="overflow-x-auto shadow-xl rounded-xl">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-100">
+                    <tr>
+                        <!-- Header Row 1 (Spans for general columns) -->
+                        <th rowspan="2" class="px-3 py-2 text-center text-xs font-bold text-gray-700 uppercase tracking-wider border-b border-gray-300 w-10">
+                            <input type="checkbox" id="select-all" onclick="toggleAllCheckboxes(this)" class="rounded text-indigo-600 focus:ring-indigo-500">
+                        </th>
+                        <th rowspan="2" class="px-3 py-2 text-center text-xs font-bold text-gray-700 uppercase tracking-wider border-b border-gray-300">ID</th>
+                        <th rowspan="2" class="px-3 py-2 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-b border-gray-300">Feature</th>
+                        <th rowspan="2" class="px-3 py-2 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-b border-gray-300">Subfeature</th>
+                        <th rowspan="2" class="px-3 py-2 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-b border-gray-300">Test Case</th>
+                        <th rowspan="2" class="px-3 py-2 text-center text-xs font-bold text-gray-700 uppercase tracking-wider border-b border-gray-300">Linked Issue</th>
+                        <th rowspan="2" class="px-3 py-2 text-center text-xs font-bold text-gray-700 uppercase tracking-wider border-b border-gray-300">Selenium Test</th>
+                        <th rowspan="2" class="px-3 py-2 text-center text-xs font-bold text-gray-700 uppercase tracking-wider border-b border-gray-300">API Test</th>
+                        <th rowspan="2" class="px-3 py-2 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-b border-gray-300">Notes</th>
+                        <!-- Pass Status Header (Spans 3 columns) -->
+                        <th colspan="3" class="px-3 py-1 text-center text-xs font-bold text-gray-700 uppercase tracking-wider border-b border-gray-300 bg-gray-200">Pass Status</th>
+                        <th rowspan="2" class="px-3 py-2 text-center text-xs font-bold text-gray-700 uppercase tracking-wider border-b border-gray-300">Actions</th>
+                    </tr>
+                    <tr>
+                        <!-- Header Row 2: Specific Browser Subheaders (with simple SVG-like icons) -->
+                        <th class="px-3 py-1 text-center text-xs font-medium text-gray-600 uppercase border-r border-gray-300">
+                            <span class="inline-block h-4 w-4 rounded-full bg-blue-600 mr-1 align-text-bottom"></span> Edge
+                        </th>
+                        <th class="px-3 py-1 text-center text-xs font-medium text-gray-600 uppercase border-r border-gray-300">
+                            <span class="inline-block h-4 w-4 rounded-full bg-yellow-500 border-2 border-green-600 mr-1 align-text-bottom"></span> Chrome
+                        </th>
+                        <th class="px-3 py-1 text-center text-xs font-medium text-gray-600 uppercase">
+                            <span class="inline-block h-4 w-4 rounded-full bg-orange-600 border-2 border-gray-800 mr-1 align-text-bottom"></span> Firefox
+                        </th>
+                    </tr>
+                </thead>
+                <tbody id="entries-table-body" class="bg-white divide-y divide-gray-200">
+                    <!-- Data rows are populated dynamically by JavaScript -->
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Custom Modal for Confirmation/Alerts (Styled replacement for alert()/confirm()) -->
+        <div id="modal" class="fixed inset-0 z-50 flex items-center justify-center hidden modal-overlay">
+            <div class="bg-white p-6 rounded-lg shadow-2xl max-w-sm w-full transform transition-all">
+                <h3 id="modal-title" class="text-lg font-semibold text-gray-900 mb-4">Modal Title</h3>
+                <p id="modal-message" class="text-gray-600 mb-6 whitespace-pre-wrap"></p>
+                <div class="flex justify-end space-x-3">
+                    <button id="modal-cancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition hidden">Cancel</button>
+                    <button id="modal-confirm" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition">OK</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script type="module">
+        // Import necessary Firebase modules from the global window object (exposed above)
+        const { 
+            initializeApp, 
+            getAuth, 
+            signInWithCustomToken, 
+            signInWithPopup, 
+            GoogleAuthProvider, 
+            signOut, 
+            onAuthStateChanged, 
+            signInAnonymously 
+        } = window.firebase;
+
+
+        // --- FIREBASE INITIALIZATION & AUTH STATE ---
+        let auth, db, userId = null;
+        let isAuthReady = false;
+
+        // Retrieve global variables provided by the Canvas environment
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        if (firebaseConfig) {
+            const app = initializeApp(firebaseConfig);
+            auth = getAuth(app);
+            db = window.firebase.getFirestore(app); // Firestore initialized but not actively used for checklist data
+
+            // Initial sign-in logic (uses custom token or falls back to anonymous)
+            const initialSignIn = async () => {
+                try {
+                    if (initialAuthToken) {
+                        await signInWithCustomToken(auth, initialAuthToken);
+                    } else {
+                        await signInAnonymously(auth);
+                    }
+                } catch (error) {
+                    console.error("Initial sign-in failed:", error);
+                    await signInAnonymously(auth); 
+                }
+            };
+
+            // Set up listener to track user login/logout state
+            onAuthStateChanged(auth, (user) => {
+                isAuthReady = true;
+                if (user) {
+                    userId = user.uid;
+                    updateAuthUI(user);
+                } else {
+                    userId = null;
+                    updateAuthUI(null);
+                }
+                // Crucial: Fetch data only after determining authentication state
+                fetchEntries();
+            });
+
+            initialSignIn();
+        } else {
+            console.warn("Firebase configuration not found. Running without authentication.");
+            isAuthReady = true;
+            fetchEntries(); // Attempt data fetch without auth
+        }
+
+        // --- AUTHENTICATION UI & ACTIONS ---
+        const authButton = document.getElementById('auth-button');
+        const userInfoDiv = document.getElementById('user-info');
+        const userNameSpan = document.getElementById('user-name');
+        const userPhotoImg = document.getElementById('user-photo');
+        const addEntryBtn = document.getElementById('add-entry-btn');
+
+        // Updates the UI based on the current user status
+        function updateAuthUI(user) {
+            if (user && !user.isAnonymous) {
+                // User logged in via Google
+                authButton.textContent = 'Logout';
+                authButton.onclick = handleLogout;
+                authButton.classList.replace('bg-indigo-600', 'bg-red-600');
+
+                userNameSpan.textContent = user.displayName || user.email;
+                userPhotoImg.src = user.photoURL || 'https://placehold.co/24x24/e0e0e0/ffffff?text=U';
+                userInfoDiv.classList.remove('hidden');
+                
+                // Enable write functionality
+                addEntryBtn.disabled = false;
+                jiraButton.disabled = Array.from(document.querySelectorAll('.select-checkbox:checked')).length === 0;
+
+            } else {
+                // Anonymous or Logged out/Guest
+                authButton.textContent = 'Google Login';
+                authButton.onclick = handleGoogleSignIn;
+                authButton.classList.replace('bg-red-600', 'bg-indigo-600');
+
+                userNameSpan.textContent = user && user.isAnonymous ? 'Guest (Anon)' : 'Guest';
+                userPhotoImg.src = 'https://placehold.co/24x24/e0e0e0/ffffff?text=G';
+                userInfoDiv.classList.remove('hidden');
+                
+                // Disable write functionality
+                addEntryBtn.disabled = true;
+                jiraButton.disabled = true;
+            }
+        }
+
+        // Handles Google sign-in using Firebase Pop-up
+        async function handleGoogleSignIn() {
+            if (!auth) {
+                showModal('Error', 'Firebase Auth is not initialized.');
+                return;
+            }
+            try {
+                const provider = new GoogleAuthProvider();
+                await signInWithPopup(auth, provider);
+                showModal('Success', 'Signed in with Google successfully!');
+            } catch (error) {
+                console.error("Google Sign-In Error:", error);
+                showModal('Error', `Google Sign-In Failed: ${error.message}`);
+            }
+        }
+
+        // Handles user sign-out
+        async function handleLogout() {
+            if (!auth) return;
+            try {
+                await signOut(auth);
+                showModal('Success', 'Logged out successfully!');
+            } catch (error) {
+                console.error("Logout Error:", error);
+                showModal('Error', `Logout failed: ${error.message}`);
+            }
+        }
+        
+        // --- API Configuration and Constants ---
+        // Using relative paths for API calls (Flask backend is assumed to be on the same host)
+        const API_BASE = ''; 
+        const API_URL = `${API_BASE}/api/entries`;
+        const JIRA_CREATE_URL = `${API_BASE}/api/jira/create`;
+        // JIRA Base URL is a placeholder in this single-file environment
+        const JIRA_BASE_URL = 'https://yourcompany.atlassian.net/browse/'; 
+        
+        // All possible status options for dropdowns
+        const STATUS_OPTIONS = ['OK', 'JIRA/Issue', 'AUTO_PASS', 'AUTO_FAIL', 'FAIL', 'NOT-TESTED', 'BLANK'];
+
+        // --- DOM Elements and State ---
+        const tableBody = document.getElementById('entries-table-body');
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const selectAllCheckbox = document.getElementById('select-all');
+        const jiraButton = document.getElementById('create-jira-btn');
+        const selectedCountSpan = document.getElementById('selected-count');
+        
+        // Modal elements
+        const modal = document.getElementById('modal');
+        const modalTitle = document.getElementById('modal-title');
+        const modalMessage = document.getElementById('modal-message');
+        const modalConfirmBtn = document.getElementById('modal-confirm');
+        const modalCancelBtn = document.getElementById('modal-cancel');
+        
+        let tempIdCounter = -1; // Counter for unique IDs of unsaved/new rows
+        
+        // --- Utility Functions ---
+
+        /**
+         * Custom modal replacement for alert() and confirm().
+         * @param {boolean} isConfirm - If true, displays Cancel button and returns a Promise.
+         */
+        function showModal(title, message, isConfirm = false) {
+            modalTitle.textContent = title;
+            modalMessage.textContent = message;
+            modal.classList.remove('hidden');
+
+            // Clear previous listeners
+            modalConfirmBtn.onclick = null;
+            modalCancelBtn.onclick = null;
+            
+            if (isConfirm) {
+                // Confirmation mode setup
+                modalConfirmBtn.textContent = 'Confirm Action';
+                modalConfirmBtn.classList.remove('bg-red-600');
+                modalConfirmBtn.classList.add('bg-indigo-600');
+                modalCancelBtn.classList.remove('hidden');
+                
+                return new Promise((resolve) => {
+                    modalConfirmBtn.onclick = () => {
+                        modal.classList.add('hidden');
+                        resolve(true);
+                    };
+                    modalCancelBtn.onclick = () => {
+                        modal.classList.add('hidden');
+                        resolve(false);
+                    };
+                });
+            } else {
+                // Alert mode setup
+                modalConfirmBtn.textContent = 'Close';
+                modalConfirmBtn.classList.remove('bg-indigo-600');
+                modalConfirmBtn.classList.add('bg-red-600');
+                modalCancelBtn.classList.add('hidden');
+                modalConfirmBtn.onclick = () => modal.classList.add('hidden');
+            }
+        }
+        
+        // Shows the loading indicator and clears the table body
+        function showLoading() {
+            loadingIndicator.classList.remove('hidden');
+            // Show loading text if no new entry row is currently active
+            if (!document.querySelector('.new-entry-row')) {
+                tableBody.innerHTML = '<tr><td colspan="13" class="p-4 text-center text-gray-500">Loading data...</td></tr>';
+            }
+        }
+
+        // Hides the loading indicator
+        function hideLoading() {
+            loadingIndicator.classList.add('hidden');
+        }
+        
+        /**
+         * Finds and converts URLs in a string into clickable anchor tags.
+         */
+        function linkifyNotes(text) {
+            if (!text) return 'N/A';
+            const urlRegex = /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/ig;
+            return text.replace(urlRegex, function(url) {
+                return `<a href="${url}" target="_blank" class="text-blue-500 hover:text-blue-700 underline text-xs">${url.length > 30 ? url.substring(0, 30) + '...' : url}</a>`;
+            });
+        }
+
+        // Updates the count and state of the JIRA creation button
+        function updateJiraButtonState() {
+            const selected = Array.from(document.querySelectorAll('.select-checkbox:checked')).length;
+            selectedCountSpan.textContent = selected;
+            // Disable if not logged in OR if nothing is selected
+            jiraButton.disabled = !userId || selected === 0;
+            
+            // Check if all displayed, persisted rows are selected
+            const totalPersistedRows = document.querySelectorAll('.select-checkbox:not([data-temp-id])').length;
+            selectAllCheckbox.checked = selected > 0 && selected === totalPersistedRows;
+        }
+
+        // Selects or deselects all checkboxes in the table
+        window.toggleAllCheckboxes = function(source) {
+            // Only toggle selection on persisted rows
+            const checkboxes = document.querySelectorAll('.select-checkbox:not([data-temp-id])');
+            for(let i=0; i < checkboxes.length; i++) {
+                checkboxes[i].checked = source.checked;
+            }
+            updateJiraButtonState();
+        }
+
+        /**
+         * Creates a styled table cell displaying the status.
+         */
+        function createStatusCell(status) {
+            const cell = document.createElement('td');
+            cell.className = 'px-3 py-2 whitespace-nowrap text-center text-sm font-medium';
+            const statusDiv = document.createElement('div');
+            // Create CSS class by replacing special characters (e.g., "JIRA/Issue" -> "JIRA-ISSUE")
+            const cssStatus = status.toUpperCase().replace(/[-\/\s]/g, '-');
+            // IMPORTANT: Use class names defined in the external styles.css
+            statusDiv.className = `status-${cssStatus} px-2 py-0.5 inline-block rounded-full text-xs`;
+            statusDiv.textContent = status;
+            cell.appendChild(statusDiv);
+            return cell;
+        }
+        
+        /**
+         * Creates an editable text input cell for inline editing/creation.
+         */
+        function createInputCell(name, value = '', isRequired = false) {
+            const cell = document.createElement('td');
+            cell.className = 'px-3 py-1';
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.name = name;
+            input.value = value || '';
+            input.required = isRequired;
+            input.className = 'table-input'; // Use class defined in external CSS
+            cell.appendChild(input);
+            return cell;
+        }
+
+        /**
+         * Creates an editable select dropdown cell for status selection.
+         */
+        function createStatusSelectCell(name, value = 'NOT-TESTED') {
+            const cell = document.createElement('td');
+            cell.className = 'px-3 py-1';
+            const select = document.createElement('select');
+            select.name = name;
+            select.className = 'table-select'; // Use class defined in external CSS
+            
+            STATUS_OPTIONS.forEach(option => {
+                const opt = document.createElement('option');
+                // Use underscore in value for cleaner JS/API handling (e.g., JIRA_Issue)
+                opt.value = option.replace('/', '_'); 
+                opt.textContent = option;
+                
+                // Determine if this option should be selected
+                const normalizedIncomingValue = value.toUpperCase().replace('/', '_');
+                const normalizedOption = option.toUpperCase().replace('/', '_');
+                
+                if (normalizedOption === normalizedIncomingValue) {
+                     opt.selected = true;
+                }
+                select.appendChild(opt);
+            });
+            cell.appendChild(select);
+            return cell;
+        }
+        
+        // --- Inline Creation/Editing Logic ---
+
+        // Inserts a new, empty, editable row at the top of the table
+        window.addNewEntryRow = function() {
+            if (!userId) {
+                showModal('Authentication Required', 'Please sign in with Google to add new test records.');
+                return;
+            }
+            // Prevent adding a new row if one is already being created/edited
+            if (document.querySelector('.new-entry-row')) {
+                showModal('Warning', 'Please save or cancel the current new record before adding another.');
+                return;
+            }
+
+            tempIdCounter--; // Decrement counter for a unique temporary ID
+            const tempId = tempIdCounter;
+            const row = tableBody.insertRow(0); // Insert at the top
+            row.id = `temp-row-${tempId}`;
+            row.className = 'new-entry-row'; // Use class defined in external CSS
+
+            // 1. Checkbox (disabled as it's not a real database record yet)
+            const cbCell = row.insertCell();
+            cbCell.className = 'px-3 py-2 text-center';
+            cbCell.innerHTML = `<input type="checkbox" data-temp-id="${tempId}" class="select-checkbox rounded text-indigo-600 focus:ring-indigo-500" disabled>`;
+            
+            // 2. ID (Placeholder)
+            const idCell = row.insertCell();
+            idCell.className = 'px-3 py-2 font-bold text-gray-400 text-center text-xs';
+            idCell.textContent = 'NEW';
+            
+            // 3-9. Input fields for core data (required fields marked)
+            row.appendChild(createInputCell('feature', '', true));
+            row.appendChild(createInputCell('sub_feature', '', true));
+            row.appendChild(createInputCell('test_case', '', true));
+            row.appendChild(createInputCell('linked_issue'));
+            row.appendChild(createInputCell('selenium_test'));
+            row.appendChild(createInputCell('api_test'));
+            row.appendChild(createInputCell('notes'));
+
+            // 10-12. Status dropdowns (required fields)
+            row.appendChild(createStatusSelectCell('status_edge', 'NOT-TESTED'));
+            row.appendChild(createStatusSelectCell('status_chrome', 'NOT-TESTED'));
+            row.appendChild(createStatusSelectCell('status_firefox', 'NOT-TESTED'));
+
+            // 13. Actions (Save/Cancel buttons)
+            const actionsCell = row.insertCell();
+            actionsCell.className = 'flex space-x-2 py-1 px-1 justify-center';
+            
+            const saveButton = document.createElement('button');
+            saveButton.textContent = 'Save';
+            saveButton.className = 'px-3 py-1 text-xs font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition shadow-sm';
+            saveButton.onclick = () => saveInlineEntry(tempId, 'POST'); // POST for new record
+            
+            const cancelButton = document.createElement('button');
+            cancelButton.textContent = 'Cancel';
+            cancelButton.className = 'px-3 py-1 text-xs font-medium text-gray-700 bg-gray-300 rounded-lg hover:bg-gray-400 transition shadow-sm';
+            cancelButton.onclick = () => row.remove(); // Simply removes the temporary row
+
+            actionsCell.appendChild(saveButton);
+            actionsCell.appendChild(cancelButton);
+        }
+
+        /**
+         * Sends data from an inline row to the backend (POST for new, PUT for update).
+         */
+        async function saveInlineEntry(id, method) {
+            if (!userId) {
+                showModal('Authentication Required', 'Please sign in to save data.');
+                return;
+            }
+            const row = document.getElementById(method === 'POST' ? `temp-row-${id}` : `row-${id}`);
+            if (!row) return;
+
+            const inputs = row.querySelectorAll('input, select');
+            const data = {};
+            let isValid = true;
+
+            // Collect data and perform client-side validation
+            inputs.forEach(input => {
+                if (input.name) {
+                    if (input.required && !input.value.trim()) {
+                        isValid = false;
+                        input.style.borderColor = 'red'; // Highlight invalid input
+                    } else {
+                        input.style.borderColor = '#d1d5db';
+                    }
+                    data[input.name] = input.value;
+                }
+            });
+
+            if (!isValid) {
+                showModal('Validation Error', 'Please fill out all required fields.');
+                return;
+            }
+
+            const url = method === 'POST' ? API_URL : `${API_URL}/${id}`;
+
+            showLoading();
+            try {
+                const response = await fetch(url, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data),
+                });
+
+                const result = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(result.error || `HTTP error! status: ${response.status}`);
+                }
+
+                // On success, clean up the temporary row and refresh
+                if (method === 'POST') {
+                    row.remove();
+                }
+                await fetchEntries(); // Reload the table to show the new/updated entry
+                showModal('Success', result.message);
+
+            } catch (error) {
+                console.error('Error saving entry:', error);
+                showModal('Error', `Failed to save entry: ${error.message}`);
+            } finally {
+                hideLoading();
+            }
+        }
+        
+        // --- Data Rendering ---
+
+        // Populates the table body with data fetched from the API
+        function renderEntries(entries) {
+            // Preserve the 'NEW' row if it exists
+            const newRow = document.querySelector('.new-entry-row');
+            tableBody.innerHTML = '';
+            if(newRow) {
+                tableBody.appendChild(newRow);
+            }
+
+            if (entries.length === 0 && !newRow) {
+                tableBody.innerHTML = '<tr><td colspan="13" class="p-4 text-center text-gray-500">No test records found.</td></tr>';
+                return;
+            }
+
+            entries.forEach(entry => {
+                const row = tableBody.insertRow();
+                row.id = `row-${entry.id}`;
+                row.className = 'hover:bg-gray-50 transition duration-150';
+
+                // Helper function for quick creation of standard text cells
+                const textCell = (content, className = 'text-xs') => {
+                    const cell = row.insertCell();
+                    cell.className = `px-3 py-2 ${className} text-gray-700 whitespace-pre-wrap`;
+                    cell.textContent = content || 'N/A';
+                    return cell;
+                };
+
+                // 1. Checkbox (for bulk selection)
+                const cbCell = row.insertCell();
+                cbCell.className = 'px-3 py-2 text-center';
+                cbCell.innerHTML = `<input type="checkbox" data-id="${entry.id}" class="select-checkbox rounded text-indigo-600 focus:ring-indigo-500">`;
+                cbCell.querySelector('.select-checkbox').addEventListener('change', updateJiraButtonState);
+
+                // 2. ID
+                const idCell = row.insertCell();
+                idCell.className = 'px-3 py-2 font-bold text-gray-900 text-center text-xs';
+                idCell.textContent = entry.id;
+
+                // 3-4. Feature/Subfeature
+                textCell(entry.feature, 'text-sm font-medium');
+                textCell(entry.sub_feature, 'text-sm');
+
+                // 5. Test Case (truncated with full text in tooltip)
+                const tcCell = textCell(entry.test_case.substring(0, 100) + (entry.test_case.length > 100 ? '...' : ''), 'text-xs');
+                tcCell.title = entry.test_case; 
+
+                // 6. Linked Issue (formatted as a clickable JIRA link)
+                const jiraCell = row.insertCell();
+                jiraCell.className = 'px-3 py-2 text-xs text-gray-700 text-center';
+                if (entry.linked_issue && entry.linked_issue !== 'N/A') {
+                    const jiraKey = entry.linked_issue.trim();
+                    // Uses .jira-link class defined in external CSS
+                    jiraCell.innerHTML = `<a href="${JIRA_BASE_URL}${jiraKey}" target="_blank" class="jira-link">${jiraKey}</a>`;
+                } else {
+                    jiraCell.textContent = 'N/A';
+                }
+
+                // 7-8. Automation Status
+                textCell(entry.selenium_test, 'text-center');
+                textCell(entry.api_test, 'text-center');
+                
+                // 9. Notes (with clickable links)
+                const notesCell = row.insertCell();
+                notesCell.className = 'px-3 py-2 text-xs text-gray-700 whitespace-pre-wrap max-w-xs';
+                notesCell.innerHTML = linkifyNotes(entry.notes);
+
+                // 10-12. Pass Status columns (using styled cells)
+                row.appendChild(createStatusCell(entry.status_edge));
+                row.appendChild(createStatusCell(entry.status_chrome));
+                row.appendChild(createStatusCell(entry.status_firefox));
+
+                // 13. Actions (Edit/Delete buttons)
+                const actionsCell = row.insertCell();
+                actionsCell.className = 'flex space-x-2 py-2 px-3 justify-center';
+                
+                const editButton = document.createElement('button');
+                editButton.textContent = 'Edit';
+                editButton.className = 'px-3 py-1 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition shadow-sm';
+                editButton.onclick = () => editEntry(entry);
+                
+                const deleteButton = document.createElement('button');
+                deleteButton.textContent = 'Delete';
+                deleteButton.className = 'px-3 py-1 text-xs font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition shadow-sm';
+                deleteButton.onclick = () => deleteEntry(entry.id);
+
+                actionsCell.appendChild(editButton);
+                actionsCell.appendChild(deleteButton);
+            });
+            updateJiraButtonState(); 
+        }
+
+        // Switches a data row into an editable inline form
+        window.editEntry = function(entry) {
+            if (!userId) {
+                showModal('Authentication Required', 'Please sign in to edit records.');
+                return;
+            }
+            if (document.querySelector('.new-entry-row') || document.querySelector('.editing-row')) {
+                showModal('Warning', 'Please save or cancel the current operation before editing another record.');
+                return;
+            }
+            
+            const oldRow = document.getElementById(`row-${entry.id}`);
+            if (!oldRow) return;
+            
+            const editingRow = document.createElement('tr');
+            editingRow.id = `row-${entry.id}`;
+            editingRow.className = 'new-entry-row editing-row'; // Uses external CSS class
+            
+            // 1-2. Checkbox/ID (read-only in edit mode)
+            const cbCell = editingRow.insertCell();
+            cbCell.className = 'px-3 py-2 text-center';
+            cbCell.innerHTML = `<input type="checkbox" data-id="${entry.id}" class="select-checkbox rounded text-indigo-600 focus:ring-indigo-500" disabled>`;
+            
+            const idCell = editingRow.insertCell();
+            idCell.className = 'px-3 py-2 font-bold text-gray-900 text-center text-xs';
+            idCell.textContent = entry.id;
+
+            // 3-9. Input fields, populated with existing data
+            editingRow.appendChild(createInputCell('feature', entry.feature, true));
+            editingRow.appendChild(createInputCell('sub_feature', entry.sub_feature, true));
+            editingRow.appendChild(createInputCell('test_case', entry.test_case, true));
+            editingRow.appendChild(createInputCell('linked_issue', entry.linked_issue));
+            editingRow.appendChild(createInputCell('selenium_test', entry.selenium_test));
+            editingRow.appendChild(createInputCell('api_test', entry.api_test));
+            editingRow.appendChild(createInputCell('notes', entry.notes));
+
+            // 10-12. Status dropdowns, pre-selected with existing data
+            editingRow.appendChild(createStatusSelectCell('status_edge', entry.status_edge));
+            editingRow.appendChild(createStatusSelectCell('status_chrome', entry.status_chrome));
+            editingRow.appendChild(createStatusSelectCell('status_firefox', entry.status_firefox));
+
+            // 13. Actions (Update/Cancel)
+            const actionsCell = editingRow.insertCell();
+            actionsCell.className = 'flex space-x-2 py-1 px-1 justify-center';
+            
+            const updateButton = document.createElement('button');
+            updateButton.textContent = 'Update';
+            updateButton.className = 'px-3 py-1 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition shadow-sm';
+            updateButton.onclick = () => saveInlineEntry(entry.id, 'PUT'); // PUT for update
+            
+            const cancelButton = document.createElement('button');
+            cancelButton.textContent = 'Cancel';
+            cancelButton.className = 'px-3 py-1 text-xs font-medium text-gray-700 bg-gray-300 rounded-lg hover:bg-gray-400 transition shadow-sm';
+            // Cancel reloads the table, which removes the editing row
+            cancelButton.onclick = () => fetchEntries(); 
+
+            actionsCell.appendChild(updateButton);
+            actionsCell.appendChild(cancelButton);
+            
+            oldRow.replaceWith(editingRow); // Swap the old row with the new editing row
+        }
+        
+        // --- JIRA and DELETE Operations ---
+
+        // Handles the bulk creation of simulated JIRA issues
+        window.createJiraIssue = async function() {
+            if (!userId) {
+                showModal('Authentication Required', 'Please sign in to create JIRA issues.');
+                return;
+            }
+
+            // Get selected IDs from checked checkboxes
+            const selectedCheckboxes = Array.from(document.querySelectorAll('.select-checkbox:checked'));
+            const entryIds = selectedCheckboxes.map(cb => parseInt(cb.dataset.id)).filter(id => !isNaN(id));
+
+            if (entryIds.length === 0) {
+                showModal('Selection Required', 'Please select one or more entries to create JIRA issues.');
+                return;
+            }
+
+            const confirmed = await showModal(
+                'Confirm JIRA Creation', 
+                `Are you sure you want to create JIRA issues for ${entryIds.length} selected entries?`, 
+                true
+            );
+
+            if (!confirmed) return;
+
+            showLoading();
+            try {
+                // Call the simulated JIRA creation endpoint
+                const response = await fetch(JIRA_CREATE_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ entry_ids: entryIds }),
+                });
+
+                const result = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(result.error || `HTTP error! status: ${response.status}`);
+                }
+
+                // Deselect all and update UI state
+                selectAllCheckbox.checked = false;
+                updateJiraButtonState();
+                
+                let successMessage = result.message + '\n\nCreated Tickets:';
+                result.results.forEach(item => {
+                    successMessage += `\nID ${item.entry_id}: ${item.ticket_key}`;
+                });
+                
+                await fetchEntries(); // Reload to show new linked issues
+                showModal('JIRA Creation Successful', successMessage);
+
+            } catch (error) {
+                console.error('Error creating JIRA issue:', error);
+                showModal('JIRA Creation Failed', `Could not create issues. Error: ${error.message}. Check the Python console for details.`);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // Handles deleting a single entry by ID
+        async function deleteEntry(id) {
+            if (!userId) {
+                showModal('Authentication Required', 'Please sign in to delete records.');
+                return;
+            }
+            const confirmed = await showModal('Confirm Deletion', `Are you sure you want to delete Test Entry ID ${id}? This action cannot be undone.`, true);
+
+            if (!confirmed) return;
+
+            showLoading();
+            try {
+                const response = await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
+
+                const result = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(result.error || `HTTP error! status: ${response.status}`);
+                }
+
+                await fetchEntries(); // Reload to show the item is gone
+                showModal('Success', result.message);
+
+            } catch (error) {
+                console.error('Error deleting entry:', error);
+                showModal('Error', `Failed to delete entry: ${error.message}`);
+            } finally {
+                hideLoading();
+            }
+        }
+
+
+        // --- Data Fetching (Main Operation) ---
+
+        // Fetches the test entries from the Flask API with exponential backoff retries
+        async function fetchEntries() {
+            // Guard clause: Wait for Firebase auth state to be confirmed
+            if (!isAuthReady) {
+                 setTimeout(fetchEntries, 100); 
+                 return;
+            }
+
+            showLoading();
+            const maxRetries = 5;
+            let lastError = null;
+
+            for (let i = 0; i < maxRetries; i++) {
+                try {
+                    // Fetch data using relative URL
+                    const response = await fetch(API_URL);
+                    if (!response.ok) {
+                        // Log HTTP errors and retry
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    const entries = await response.json();
+                    renderEntries(entries);
+                    return; // Success, exit function
+                } catch (error) {
+                    lastError = error;
+                    if (i < maxRetries - 1) {
+                        // Exponential backoff delay
+                        const delay = Math.pow(2, i) * 1000;
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                    }
+                }
+            }
+            
+            // If all retries fail, show a final connection error
+            console.error('Error fetching entries after multiple retries:', lastError);
+            showModal('API Connection Error', 
+                `Failed to connect to the Python backend after multiple attempts. 
+                Please ensure the Python Flask server (app.py) is running. 
+                Original Error: ${lastError.message}`);
+            hideLoading();
+        }
+
+        // Data fetching is initially triggered by the onAuthStateChanged listener
+    </script>
+</body>
+</html>

@@ -1,0 +1,55 @@
+# --- STAGE 1: Builder Stage ---
+# Installs Python dependencies (asyncpg) and necessary build tools.
+FROM python:3.10 as builder
+
+# Set the working directory for the application source code
+WORKDIR /app/backend
+
+# Install build dependencies (needed for asyncpg compilation)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        libpq-dev \
+        gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements and install Python dependencies
+COPY backend/requirements.txt .
+# Uvicorn is specified with [standard] which pulls in necessary packages
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+
+# --- STAGE 2: Final Runtime Stage ---
+# Use a minimal image for the final container to reduce size.
+FROM python:3.10-slim
+
+# Install only the runtime library needed for PostgreSQL connection (libpq5)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends libpq5 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set the working directory to the container's root
+WORKDIR /app
+
+# Copy the installed Python packages (dependencies) from the builder stage
+COPY --from=builder /usr/local/lib/python3.10/site-packages /usr/local/lib/python3.10/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
+
+# Copy application backend files and configuration
+COPY backend /app/backend
+
+# Copy the static frontend files
+COPY frontend /app/frontend
+
+# Expose the application port
+EXPOSE 5000
+
+# Define environment variables for PostgreSQL connection (Secrets are here!)
+ENV POSTGRES_HOST=db
+ENV POSTGRES_DB=ldqa_checklist
+ENV POSTGRES_USER=postgres
+ENV POSTGRES_PASSWORD=postgres
+
+# Command to run the application using Uvicorn (ASGI server)
+# CMD executes the create_app() function indirectly via module name:app instance name
+CMD ["uvicorn", "backend.app:app", "--host", "0.0.0.0", "--port", "5000"]
